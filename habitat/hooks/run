@@ -1,0 +1,38 @@
+#!{{pkgPathFor "core/bash"}}/bin/bash
+
+# Redirect stderr to stdout
+# This will be captured by Habitat and viewable via `journalctl`
+# NOTE: We might want log to "{{pkg.svc_path}}/logs" and handle rotation
+exec 2>&1
+
+# InSpec will try to create a .cache directory in the user's home directory
+# so this needs to be someplace writeable by the hab user
+export HOME={{pkg.svc_var_path}}
+UUID=`cat /sys/class/dmi/id/product_uuid`
+sed -i "s/<TOKEN>/$A2TOKEN/g; s/<NAME>/$HOSTNAME/g; s/<UUID>/$UUID/g" {{pkg.svc_config_path}}/reporter.json
+
+RESULTS_DIR="{{pkg.svc_var_path}}/inspec_results"
+RESULTS_FILE="${RESULTS_DIR}/{{pkg.name}}.json"
+
+# Create a directory for InSpec reporter output
+mkdir -p $(dirname $RESULTS_FILE)
+
+while true; do
+  echo "Executing InSpec for {{pkg.ident}}"
+  inspec exec "{{pkg.path}}/profiles/*" --json-config={{pkg.svc_config_path}}/reporter.json > ${RESULTS_FILE}
+
+  EXIT_STATUS=$?
+  if [ $EXIT_STATUS -eq 0 ]; then
+    echo "InSpec run completed successfully."
+  elif [ $EXIT_STATUS -eq 100 ]; then
+    echo "InSpec run completed successfully, with at least 1 failed test"
+  elif [ $EXIT_STATUS -eq 101 ]; then
+    echo "InSpec run completed successfully, with skipped tests and no failures"
+  else
+    echo "InSpec run did not complete successfully. Exited with status: $?"
+  fi
+  echo "Results located here: ${RESULTS_FILE}"
+
+  echo "Sleeping for {{cfg.sleep_time}} seconds"
+  sleep {{cfg.sleep_time}}
+done

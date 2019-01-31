@@ -1,0 +1,3 @@
+sleep_time = 300
+a2url = "automate.local"
+environment = "test"

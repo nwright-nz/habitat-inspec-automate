@@ -1,44 +1,49 @@
-DevSec Linux Baseline
+Habitat Inspec Automate example
 =====================
 
-This Compliance Profile ensures that all hardening projects keep the same quality.
+This is an example of how to use habitat to run an inspec profile and report compliance to Automate. 
+Standard 'built on the shoulders of giants' disclaimer: I have not modified the DevSec Linux Baseline control here (<https://github.com/dev-sec/linux-baseline>), and the habitat piece was guided by the AWESOME tutorial here : <https://youtu.be/xJRnmfwjezA> . I've just modified the run hook to report back to Automate, and fixed the plan so the hab pkg build command will work outside studio.
 
-- https://github.com/dev-sec/puppet-os-hardening
-- https://github.com/dev-sec/chef-os-hardening
-- https://github.com/dev-sec/ansible-os-hardening
 
-## Standalone Usage
-
-This Compliance Profile requires [InSpec](https://github.com/chef/inspec) for execution:
-
+### Configuration
+In order to report status to Automate, we need to use the automate reporter. This takes a JSON file as an argument, and the skeleton of this file is in the `habitat/config/reporter.json` file : 
+``` json
+{ 
+    "reporter": {
+    "automate" : {
+        "stdout" : true,
+        "url" : "https://{{cfg.a2url}}/data-collector/v0/",
+        "token" : "<TOKEN>",
+        "insecure" : true,
+        "node_name" : "<NAME>",
+        "node_uuid" : "<UUID>",  
+        "environment" : "{{cfg.environment}}"
+    }
+}
+}
 ```
-$ git clone https://github.com/dev-sec/linux-baseline
-$ inspec exec linux-baseline
+
+To specify your A2 server and environment, update the default.toml file.   
+
+`<NAME>` is populated by the $HOSTNAME environment variable   
+`<UUID>` is populated by the following command: `cat /sys/class/dmi/id/product_uuid`   
+`<TOKEN>` is populated with the A2TOKEN environment variable
+
+### Run Hook changes
+The habitat setup was done with the inspec habitat integration. The following command was run in the root of the Inspec profile :
+```text 
+inspec habitat profile setup .
+```
+This will create the plan, and the run hook. 
+
+The following lines were added to the run hook to populate the json config file: 
+```text
+UUID=`cat /sys/class/dmi/id/product_uuid`
+
+sed -i "s/<TOKEN>/$A2TOKEN/g; s/<NAME>/$HOSTNAME/g; s/<UUID>/$UUID/g" {{pkg.svc_config_path}}/reporter.json
+```
+And the `inspec exec` line was modified to the below to use the Automate reporter:
+```text
+inspec exec "{{pkg.path}}/profiles/*" --json-config={{pkg.svc_config_path}}/reporter.json > ${RESULTS_FILE}
 ```
 
-You can also execute the profile directly from Github:
-
-```
-$ inspec exec https://github.com/dev-sec/linux-baseline
-```
-
-## License and Author
-
-* Author:: Patrick Muench <patrick.meier111@googlemail.com>
-* Author:: Dominik Richter <dominik.richter@googlemail.com>
-* Author:: Christoph Hartmann <chris@lollyrock.com>
-* Author:: Edmund Haselwanter <me@ehaselwanter.com>
-
-* Copyright 2014-2016, The Hardening Framework Team
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.

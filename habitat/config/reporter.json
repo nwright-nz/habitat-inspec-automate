@@ -1,0 +1,13 @@
+{ 
+    "reporter": {
+    "automate" : {
+        "stdout" : true,
+        "url" : "https://{{cfg.a2url}}/data-collector/v0/",
+        "token" : "<TOKEN>",
+        "insecure" : true,
+        "node_name" : "<NAME>",
+        "node_uuid" : "<UUID>",  
+        "environment" : "{{cfg.environment}}"
+    }
+}
+}
